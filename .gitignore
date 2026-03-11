@@ -1,0 +1,22 @@
+# --- Python / FastAPI (Backend) ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env
+backend/db/*.sqlite3
+
+# --- Flutter / Dart (Frontend) ---
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+frontend/.env
+
+# --- OS / IDE Files ---
+.DS_Store
+.idea/
+.vscode/

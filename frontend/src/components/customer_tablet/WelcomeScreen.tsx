@@ -1,0 +1,345 @@
+// [Member 3 - Abhinav] frontend/src/components/customer_tablet/WelcomeScreen.tsx
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import * as THREE from 'three';
+import { LanguageSelector } from './LanguageSelector';
+
+/* ================================================================
+   TYPES
+================================================================ */
+type Screen = 'welcome' | 'confirming' | 'voice';
+
+export interface WelcomeScreenProps {
+  onLanguageSelect: (languageCode: string, languageName: string) => void;
+}
+
+interface ChatMessage {
+  id: number;
+  text: string;
+  role: 'agent' | 'user';
+}
+
+/* ================================================================
+   LOCALISATION DATA
+================================================================ */
+const CONFIRMATION_MESSAGES: Record<string, string> = {
+  en: 'Your language has been selected.',
+  hi: 'आपकी भाषा चुनी गई है।',
+  mr: 'तुमची भाषा निवडली गेली आहे.',
+  ta: 'உங்கள் மொழி தேர்ந்தெடுக்கப்பட்டது.',
+  te: 'మీ భాష ఎంచుకోబడింది.',
+  bn: 'আপনার ভাষা নির্বাচন করা হয়েছে।',
+};
+
+const GREETINGS: Record<string, string> = {
+  en: "Hello! I'm V.A.N.I, your banking assistant. How can I help you today?",
+  hi: 'नमस्ते! मैं V.A.N.I हूँ, आपकी बैंकिंग सहायक। आज मैं आपकी कैसे मदद कर सकती हूँ?',
+  mr: 'नमस्कार! मी V.A.N.I आहे, तुमची बँकिंग सहाय्यक. आज मी तुम्हाला कशी मदत करू?',
+  ta: 'வணக்கம்! நான் V.A.N.I, உங்கள் வங்கி உதவியாளர். இன்று நான் உங்களுக்கு எப்படி உதவலாம்?',
+  te: 'నమస్కారం! నేను V.A.N.I, మీ బ్యాంకింగ్ సహాయకుడు. ఈరోజు నేను మీకు ఎలా సహాయపడగలను?',
+  bn: 'নমস্কার! আমি V.A.N.I, আপনার ব্যাংকিং সহকারী। আজ আমি আপনাকে কীভাবে সাহায্য করতে পারি?',
+};
+
+/* ================================================================
+   THREE.JS HOOK
+================================================================ */
+function useThreeBackground(canvasRef: React.RefObject<HTMLCanvasElement | null>): void {
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const SEP = 150, AX = 34, AY = 48;
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.set(0, 355, 1220);
+
+    const positions: number[] = [];
+    const colors: number[] = [];
+
+    for (let ix = 0; ix < AX; ix++) {
+      for (let iy = 0; iy < AY; iy++) {
+        positions.push(ix * SEP - (AX * SEP) / 2, 0, iy * SEP - (AY * SEP) / 2);
+        colors.push(0.18, 0.42, 0.82);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+    const mat = new THREE.PointsMaterial({
+      size: 6,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.52,
+      sizeAttenuation: true,
+    });
+
+    scene.add(new THREE.Points(geo, mat));
+
+    let count = 0;
+    let animId: number;
+
+    const animate = () => {
+      animId = requestAnimationFrame(animate);
+      const pos = geo.attributes.position.array as Float32Array;
+      let i = 0;
+      for (let ix = 0; ix < AX; ix++) {
+        for (let iy = 0; iy < AY; iy++) {
+          pos[i * 3 + 1] =
+            Math.sin((ix + count) * 0.3) * 55 + Math.sin((iy + count) * 0.5) * 45;
+          i++;
+        }
+      }
+      geo.attributes.position.needsUpdate = true;
+      renderer.render(scene, camera);
+      count += 0.07;
+    };
+
+    const onResize = () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    };
+
+    window.addEventListener('resize', onResize);
+    animate();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', onResize);
+      geo.dispose();
+      mat.dispose();
+      renderer.dispose();
+    };
+  }, [canvasRef]);
+}
+
+/* ================================================================
+   VOICE VISUALIZER BARS
+================================================================ */
+const BAR_COUNT = 48;
+
+function VoiceVisualizer({ active }: { active: boolean }): React.ReactElement {
+  const [heights, setHeights] = useState<number[]>(new Array(BAR_COUNT).fill(4));
+  const frameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const animate = () => {
+      if (!active) return;
+      setHeights(Array.from({ length: BAR_COUNT }, () => 10 + Math.random() * 90));
+      frameRef.current = window.setTimeout(animate, 90);
+    };
+
+    if (active) {
+      animate();
+    } else {
+      if (frameRef.current !== null) clearTimeout(frameRef.current);
+      setHeights(new Array(BAR_COUNT).fill(4));
+    }
+
+    return () => {
+      if (frameRef.current !== null) clearTimeout(frameRef.current);
+    };
+  }, [active]);
+
+  return (
+    <div className="visualizer">
+      {heights.map((h, i) => (
+        <div
+          key={i}
+          className="viz-bar"
+          style={active ? { height: `${h}%`, background: `rgba(${Math.round(50 + h)}, ${Math.round(100 + h * 0.4)}, 255, 0.7)` } : undefined}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ================================================================
+   MAIN COMPONENT
+================================================================ */
+export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useThreeBackground(canvasRef);
+
+  const [screen, setScreen]             = useState<Screen>('welcome');
+  const [selectedCode, setSelectedCode] = useState<string>('');
+  const [selectedName, setSelectedName] = useState<string>('');
+  const [messages, setMessages]         = useState<ChatMessage[]>([]);
+  const [msgCounter, setMsgCounter]     = useState<number>(0);
+  const [recording, setRecording]       = useState<boolean>(false);
+  const [elapsed, setElapsed]           = useState<number>(0);
+  const chatAreaRef                     = useRef<HTMLDivElement>(null);
+  const timerRef                        = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /* Scroll chat to bottom on new messages */
+  useEffect(() => {
+    if (chatAreaRef.current) {
+      chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  /* ---- Language chosen ---- */
+  const handleLanguageSelection = (code: string, name: string) => {
+    setSelectedCode(code);
+    setSelectedName(name);
+    setScreen('confirming');
+
+    setTimeout(() => {
+      // Seed greeting message
+      const greeting = GREETINGS[code] ?? GREETINGS['en'];
+      setMessages([{ id: 0, text: greeting, role: 'agent' }]);
+      setMsgCounter(1);
+      setScreen('voice');
+      onLanguageSelect(code, name);
+    }, 1500);
+  };
+
+  /* ---- Mic toggle ---- */
+  const addMessage = useCallback((text: string, role: 'agent' | 'user') => {
+    setMsgCounter(prev => {
+      const id = prev;
+      setMessages(msgs => [...msgs, { id, text, role }]);
+      return prev + 1;
+    });
+  }, []);
+
+  const handleMicToggle = () => {
+    if (recording) {
+      // Stop
+      setRecording(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (elapsed > 0) {
+        addMessage('मुझे अपने खाते में मदद चाहिए।', 'user');
+        setTimeout(() => {
+          addMessage(
+            'I can see your account balance is ₹24,580. Is there anything else you need?',
+            'agent',
+          );
+        }, 1600);
+      }
+      setElapsed(0);
+    } else {
+      // Start
+      setRecording(true);
+      setElapsed(0);
+      timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000);
+    }
+  };
+
+  /* ---- Reset ---- */
+  const handleReset = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setRecording(false);
+    setElapsed(0);
+    setMessages([]);
+    setSelectedCode('');
+    setSelectedName('');
+    setScreen('welcome');
+  };
+
+  /* ---- Helpers ---- */
+  const fmt = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+  /* ================================================================
+     JSX
+  ================================================================ */
+  return (
+    <>
+      {/* Three.js canvas — always present behind everything */}
+      <canvas ref={canvasRef} className="three-canvas" />
+      <div className="glow-overlay" />
+
+      {/* --- SCREEN: WELCOME --- */}
+      {screen === 'welcome' && (
+        <div className="welcome-container">
+          <div>
+            <h1 className="welcome-logo">V.A.N.I</h1>
+            <p className="vani-tagline">Voice-powered AI for Natural Interaction</p>
+          </div>
+
+          <div className="welcome-subtitles script-native">
+            <span>Please select your preferred language to begin</span>
+            <span>कृपया शुरू करने के लिए अपनी पसंदीदा भाषा चुनें</span>
+            <span>தொடங்குவதற்கு உங்கள் விருப்பமான மொழியைத் தேர்ந்தெடுக்கவும்</span>
+            <span>কৃপয়া শুরু করতে আপনার পছন্দের ভাষা নির্বাচন করুন</span>
+          </div>
+
+          <LanguageSelector onLanguageSelect={handleLanguageSelection} />
+        </div>
+      )}
+
+      {/* --- SCREEN: CONFIRMING --- */}
+      {screen === 'confirming' && (
+        <div className="confirmation-container" aria-live="polite">
+          <div className="confirmation-message script-native">
+            {CONFIRMATION_MESSAGES[selectedCode] ?? 'Processing...'}
+          </div>
+          <div className="spinner" role="status" aria-label="Loading" />
+        </div>
+      )}
+
+      {/* --- SCREEN: VOICE CHAT --- */}
+      {screen === 'voice' && (
+        <div className="voice-screen">
+          {/* Header */}
+          <div className="voice-header">
+            <span className="voice-header-logo">V.A.N.I</span>
+            <span className="voice-header-subtitle">Banking Assistant</span>
+            <span className="lang-badge">{selectedCode.toUpperCase()}</span>
+          </div>
+
+          {/* Chat bubbles */}
+          <div className="chat-area" ref={chatAreaRef}>
+            {messages.map(msg => (
+              <div key={msg.id} className={`chat-bubble ${msg.role} script-native`}>
+                {msg.text}
+              </div>
+            ))}
+          </div>
+
+          {/* Voice input panel */}
+          <div className="voice-panel">
+            <button
+              className={`mic-btn ${recording ? 'active' : ''}`}
+              onClick={handleMicToggle}
+              aria-label={recording ? 'Stop recording' : 'Start recording'}
+              aria-pressed={recording}
+            >
+              {/* Mic SVG icon */}
+              <svg className="mic-icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+                <line x1="8"  y1="23" x2="16" y2="23" />
+              </svg>
+              {/* Spinner shown only when active (CSS-controlled) */}
+              <div className="mic-spinner-sq" aria-hidden="true" />
+            </button>
+
+            <span className={`voice-timer ${recording ? 'active' : ''}`}>{fmt(elapsed)}</span>
+
+            <VoiceVisualizer active={recording} />
+
+            <span className={`voice-hint ${recording ? 'active' : ''}`}>
+              {recording ? 'Listening...' : 'Click to speak'}
+            </span>
+          </div>
+
+          <button className="reset-link" onClick={handleReset} aria-label="Change language">
+            ← Change language
+          </button>
+        </div>
+      )}
+    </>
+  );
+};
+
+export default WelcomeScreen;

@@ -9,6 +9,7 @@ class VANIWebSocketService {
   private reconnectTimeout: number | null = null;
   private isConnecting: boolean = false;
   private stream: MediaStream | null = null;
+  private selectedLanguage: string = 'hi'; // default to Hindi
 
   async connect(): Promise<void> {
     if (this.isConnecting || (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING))) {
@@ -20,8 +21,21 @@ class VANIWebSocketService {
     try {
       this.ws = new WebSocket('ws://localhost:8000/ws/stream');
 
+      // The event listener must be added only once
+      // Register it when the session starts
+      window.addEventListener('vani:language-selected', (e: Event) => {
+        const { languageCode } = (e as CustomEvent<{ languageCode: string }>).detail;
+        this.selectedLanguage = languageCode;
+      });
+
       this.ws.onopen = async () => {
         this.isConnecting = false;
+        
+        this.ws?.send(JSON.stringify({ 
+          type: 'session_start', 
+          language: this.selectedLanguage 
+        }));
+
         this.startPing();
         try {
           this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -96,7 +110,10 @@ class VANIWebSocketService {
   private startPing(): void {
     this.pingInterval = window.setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ type: "ping" }));
+        this.ws.send(JSON.stringify({ 
+          type: 'ping',
+          language: this.selectedLanguage 
+        }));
       }
     }, 30000);
   }

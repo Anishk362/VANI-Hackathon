@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { LanguageSelector } from './LanguageSelector';
+import { notifyWebSocket } from '../../services/apiService';
 
 /* ================================================================
    TYPES
@@ -19,16 +20,27 @@ interface ChatMessage {
   role: 'agent' | 'user';
 }
 
+function MicrophoneGlyph({ className = '' }: { className?: string }): React.ReactElement {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" y1="19" x2="12" y2="23" />
+      <line x1="8" y1="23" x2="16" y2="23" />
+    </svg>
+  );
+}
+
 /* ================================================================
    LOCALISATION DATA
 ================================================================ */
 const CONFIRMATION_MESSAGES: Record<string, string> = {
-  en: 'Your language has been selected.',
-  hi: 'आपकी भाषा चुनी गई है।',
-  mr: 'तुमची भाषा निवडली गेली आहे.',
-  ta: 'உங்கள் மொழி தேர்ந்தெடுக்கப்பட்டது.',
-  te: 'మీ భాష ఎంచుకోబడింది.',
-  bn: 'আপনার ভাষা নির্বাচন করা হয়েছে।',
+  en: 'Language selected. You may speak now.',
+  hi: 'भाषा चुनी गई। अब आप बोल सकते हैं।',
+  mr: 'भाषा निवडली. आता बोला.',
+  ta: 'மொழி தேர்ந்தெடுக்கப்பட்டது. இப்போது பேசலாம்.',
+  te: 'భాష ఎంచుకోబడింది. ఇప్పుడు మాట్లాడవచ్చు.',
+  bn: 'ভাষা নির্বাচিত। এখন কথা বলুন।',
 };
 
 const GREETINGS: Record<string, string> = {
@@ -168,6 +180,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useThreeBackground(canvasRef);
 
+  const [showLoading, setShowLoading]   = useState<boolean>(true);
+  const [loadingExit, setLoadingExit]   = useState<boolean>(false);
   const [screen, setScreen]             = useState<Screen>('welcome');
   const [selectedCode, setSelectedCode] = useState<string>('');
   const [selectedName, setSelectedName] = useState<string>('');
@@ -185,14 +199,29 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
     }
   }, [messages]);
 
-  /* ---- Language chosen ---- */
+  /* ---- Initial loading transition ---- */
+  useEffect(() => {
+    const exitTimer = window.setTimeout(() => setLoadingExit(true), 900);
+    const completeTimer = window.setTimeout(() => setShowLoading(false), 1400);
+
+    return () => {
+      window.clearTimeout(exitTimer);
+      window.clearTimeout(completeTimer);
+    };
+  }, []);
+
+  /* ---- Language chosen (from prime tiles OR modal) ---- */
   const handleLanguageSelection = (code: string, name: string) => {
     setSelectedCode(code);
     setSelectedName(name);
     setScreen('confirming');
 
+    // notifyWebSocket is already called inside LanguageSelector,
+    // but we call it here too for safety / if called from other paths
+    notifyWebSocket(code);
+
+    // After 1.5s of mic animation, transition to voice screen
     setTimeout(() => {
-      // Seed greeting message
       const greeting = GREETINGS[code] ?? GREETINGS['en'];
       setMessages([{ id: 0, text: greeting, role: 'agent' }]);
       setMsgCounter(1);
@@ -212,7 +241,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
 
   const handleMicToggle = () => {
     if (recording) {
-      // Stop
       setRecording(false);
       if (timerRef.current) clearInterval(timerRef.current);
       if (elapsed > 0) {
@@ -226,7 +254,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
       }
       setElapsed(0);
     } else {
-      // Start
       setRecording(true);
       setElapsed(0);
       timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000);
@@ -248,6 +275,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
+  const confirmText = CONFIRMATION_MESSAGES[selectedCode] ?? 'Language selected. You may speak now.';
+
   /* ================================================================
      JSX
   ================================================================ */
@@ -257,32 +286,67 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
       <canvas ref={canvasRef} className="three-canvas" />
       <div className="glow-overlay" />
 
+      {showLoading && (
+        <div className={`loading-screen ${loadingExit ? 'is-exiting' : ''}`} aria-live="polite">
+          <div className="loading-content">
+            <h1 className="loading-logo">V.A.N.I</h1>
+            <div className="loading-spinner" aria-hidden="true" />
+            <p className="loading-text">Initializing V.A.N.I...</p>
+          </div>
+        </div>
+      )}
+
       {/* --- SCREEN: WELCOME --- */}
-      {screen === 'welcome' && (
+      {!showLoading && screen === 'welcome' && (
         <div className="welcome-container">
           <div>
             <h1 className="welcome-logo">V.A.N.I</h1>
             <p className="vani-tagline">Voice-powered AI for Natural Interaction</p>
           </div>
 
-          <div className="welcome-subtitles script-native">
-            <span>Please select your preferred language to begin</span>
-            <span>कृपया शुरू करने के लिए अपनी पसंदीदा भाषा चुनें</span>
-            <span>தொடங்குவதற்கு உங்கள் விருப்பமான மொழியைத் தேர்ந்தெடுக்கவும்</span>
-            <span>কৃপয়া শুরু করতে আপনার পছন্দের ভাষা নির্বাচন করুন</span>
+          <div className="welcome-callout">
+            <div className="welcome-mic-wrapper" aria-hidden="true">
+              <div className="sonar-ring welcome-sonar-ring sonar-ring-1" />
+              <div className="sonar-ring welcome-sonar-ring sonar-ring-2" />
+              <div className="sonar-ring welcome-sonar-ring sonar-ring-3" />
+              <div className="welcome-mic-icon">
+                <MicrophoneGlyph className="mic-icon-svg" />
+              </div>
+            </div>
+
+            <div className="welcome-subtitles">
+              <span>Please select your preferred language to begin</span>
+            </div>
           </div>
 
-          <LanguageSelector onLanguageSelect={handleLanguageSelection} />
+          <div className="welcome-language-selector">
+            <LanguageSelector onLanguageSelect={handleLanguageSelection} />
+          </div>
         </div>
       )}
 
-      {/* --- SCREEN: CONFIRMING --- */}
+      {/* --- SCREEN: CONFIRMING (Mic Ripple Animation) --- */}
       {screen === 'confirming' && (
         <div className="confirmation-container" aria-live="polite">
-          <div className="confirmation-message script-native">
-            {CONFIRMATION_MESSAGES[selectedCode] ?? 'Processing...'}
+          {/* Mic icon with sonar ripple rings */}
+          <div className="mic-confirm-wrapper">
+            <div className="sonar-ring sonar-ring-1" />
+            <div className="sonar-ring sonar-ring-2" />
+            <div className="sonar-ring sonar-ring-3" />
+            <div className="mic-confirm-icon" aria-label="Microphone active">
+              <MicrophoneGlyph className="mic-icon-svg" />
+            </div>
           </div>
-          <div className="spinner" role="status" aria-label="Loading" />
+
+          {/* Confirmation text in selected language */}
+          <div className="confirmation-message script-native">
+            {confirmText}
+          </div>
+
+          {/* Gold language badge */}
+          <span className="confirm-lang-badge">
+            {selectedName || selectedCode.toUpperCase()}
+          </span>
         </div>
       )}
 
@@ -313,14 +377,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
               aria-label={recording ? 'Stop recording' : 'Start recording'}
               aria-pressed={recording}
             >
-              {/* Mic SVG icon */}
-              <svg className="mic-icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="23" />
-                <line x1="8"  y1="23" x2="16" y2="23" />
-              </svg>
-              {/* Spinner shown only when active (CSS-controlled) */}
+              <MicrophoneGlyph className="mic-icon-svg" />
               <div className="mic-spinner-sq" aria-hidden="true" />
             </button>
 

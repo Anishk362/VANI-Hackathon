@@ -180,8 +180,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useThreeBackground(canvasRef);
 
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [showLoading, setShowLoading]   = useState<boolean>(true);
   const [loadingExit, setLoadingExit]   = useState<boolean>(false);
+  const [welcomeMicActive, setWelcomeMicActive] = useState<boolean>(false);
   const [screen, setScreen]             = useState<Screen>('welcome');
   const [selectedCode, setSelectedCode] = useState<string>('');
   const [selectedName, setSelectedName] = useState<string>('');
@@ -210,15 +212,29 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
     };
   }, []);
 
+  /* ---- Theme persistence ---- */
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem('vani-theme');
+    const shouldUseLight = savedTheme === 'light';
+    setIsDarkMode(!shouldUseLight);
+    document.body.classList.toggle('light-mode', shouldUseLight);
+  }, []);
+
+  const handleThemeToggle = () => {
+    setIsDarkMode((prev) => {
+      const nextIsDark = !prev;
+      const theme = nextIsDark ? 'dark' : 'light';
+      document.body.classList.toggle('light-mode', !nextIsDark);
+      window.localStorage.setItem('vani-theme', theme);
+      return nextIsDark;
+    });
+  };
+
   /* ---- Language chosen (from prime tiles OR modal) ---- */
   const handleLanguageSelection = (code: string, name: string) => {
     setSelectedCode(code);
     setSelectedName(name);
     setScreen('confirming');
-
-    // notifyWebSocket is already called inside LanguageSelector,
-    // but we call it here too for safety / if called from other paths
-    notifyWebSocket(code);
 
     // After 1.5s of mic animation, transition to voice screen
     setTimeout(() => {
@@ -226,6 +242,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
       setMessages([{ id: 0, text: greeting, role: 'agent' }]);
       setMsgCounter(1);
       setScreen('voice');
+      notifyWebSocket(code);
       onLanguageSelect(code, name);
     }, 1500);
   };
@@ -258,6 +275,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
       setElapsed(0);
       timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000);
     }
+  };
+
+  const handleWelcomeMicClick = () => {
+    setWelcomeMicActive(true);
+    window.setTimeout(() => {
+      setWelcomeMicActive(false);
+    }, 2200);
   };
 
   /* ---- Reset ---- */
@@ -296,6 +320,28 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
         </div>
       )}
 
+      <button
+        type="button"
+        onClick={handleThemeToggle}
+        aria-label="Toggle theme"
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          background: 'transparent',
+          border: '1px solid currentColor',
+          color: 'var(--text-primary)',
+          padding: '8px 16px',
+          borderRadius: '20px',
+          fontSize: '0.85rem',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease',
+          zIndex: 100,
+        }}
+      >
+        {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+      </button>
+
       {/* --- SCREEN: WELCOME --- */}
       {!showLoading && screen === 'welcome' && (
         <div className="welcome-container">
@@ -305,14 +351,19 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
           </div>
 
           <div className="welcome-callout">
-            <div className="welcome-mic-wrapper" aria-hidden="true">
-              <div className="sonar-ring welcome-sonar-ring sonar-ring-1" />
-              <div className="sonar-ring welcome-sonar-ring sonar-ring-2" />
-              <div className="sonar-ring welcome-sonar-ring sonar-ring-3" />
+            <button
+              type="button"
+              className="welcome-mic-wrapper"
+              aria-label="Decorative microphone"
+              onClick={handleWelcomeMicClick}
+            >
+              {welcomeMicActive && <div className="sonar-ring welcome-sonar-ring sonar-ring-1" />}
+              {welcomeMicActive && <div className="sonar-ring welcome-sonar-ring sonar-ring-2" />}
+              {welcomeMicActive && <div className="sonar-ring welcome-sonar-ring sonar-ring-3" />}
               <div className="welcome-mic-icon">
                 <MicrophoneGlyph className="mic-icon-svg" />
               </div>
-            </div>
+            </button>
 
             <div className="welcome-subtitles">
               <span>Please select your preferred language to begin</span>

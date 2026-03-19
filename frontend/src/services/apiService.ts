@@ -1,6 +1,7 @@
 // [Member 3 - Abhinav] frontend/src/services/apiService.ts
 
-import axios, { AxiosResponse } from 'axios';
+import axios from 'axios';
+import type { AxiosResponse } from 'axios';
 
 /**
  * Request shape for the summary generation.
@@ -42,7 +43,7 @@ export function notifyWebSocket(languageCode: string): void {
 export async function generateSummary(sessionId: string): Promise<Blob> {
   try {
     const payload: GenerateSummaryRequest = { session_id: sessionId };
-    
+
     const response: AxiosResponse<Blob> = await axios.post(
       `${BASE_URL}/api/generate-summary`,
       payload,
@@ -50,7 +51,7 @@ export async function generateSummary(sessionId: string): Promise<Blob> {
     );
 
     const blob = response.data;
-    
+
     // Automatically trigger browser download with temporary anchor.
     const downloadUrl = URL.createObjectURL(blob);
     const anchor = document.createElement('a');

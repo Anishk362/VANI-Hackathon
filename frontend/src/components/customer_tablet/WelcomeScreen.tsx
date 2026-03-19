@@ -183,7 +183,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [showLoading, setShowLoading]   = useState<boolean>(true);
   const [loadingExit, setLoadingExit]   = useState<boolean>(false);
-  const [welcomeMicActive, setWelcomeMicActive] = useState<boolean>(false);
   const [screen, setScreen]             = useState<Screen>('welcome');
   const [selectedCode, setSelectedCode] = useState<string>('');
   const [selectedName, setSelectedName] = useState<string>('');
@@ -218,6 +217,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
     const shouldUseLight = savedTheme === 'light';
     setIsDarkMode(!shouldUseLight);
     document.body.classList.toggle('light-mode', shouldUseLight);
+    document.title = 'V.A.N.I — Customer Tablet';
   }, []);
 
   const handleThemeToggle = () => {
@@ -277,12 +277,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
     }
   };
 
-  const handleWelcomeMicClick = () => {
-    setWelcomeMicActive(true);
-    window.setTimeout(() => {
-      setWelcomeMicActive(false);
-    }, 2200);
-  };
+  const handleWelcomeMicClick = () => undefined;
 
   /* ---- Reset ---- */
   const handleReset = () => {
@@ -322,22 +317,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
 
       <button
         type="button"
+        className="theme-toggle-btn"
         onClick={handleThemeToggle}
         aria-label="Toggle theme"
-        style={{
-          position: 'absolute',
-          top: '16px',
-          right: '16px',
-          background: 'transparent',
-          border: '1px solid currentColor',
-          color: 'var(--text-primary)',
-          padding: '8px 16px',
-          borderRadius: '20px',
-          fontSize: '0.85rem',
-          cursor: 'pointer',
-          transition: 'all 0.3s ease',
-          zIndex: 100,
-        }}
       >
         {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
       </button>
@@ -353,14 +335,14 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
           <div className="welcome-callout">
             <button
               type="button"
-              className="welcome-mic-wrapper"
-              aria-label="Decorative microphone"
+              className="vani-mic-orb"
+              aria-label="Tap to speak"
               onClick={handleWelcomeMicClick}
             >
-              {welcomeMicActive && <div className="sonar-ring welcome-sonar-ring sonar-ring-1" />}
-              {welcomeMicActive && <div className="sonar-ring welcome-sonar-ring sonar-ring-2" />}
-              {welcomeMicActive && <div className="sonar-ring welcome-sonar-ring sonar-ring-3" />}
-              <div className="welcome-mic-icon">
+              <div className="vani-mic-orb__ring vani-mic-orb__ring--1" />
+              <div className="vani-mic-orb__ring vani-mic-orb__ring--2" />
+              <div className="vani-mic-orb__ring vani-mic-orb__ring--3" />
+              <div className="vani-mic-orb__core">
                 <MicrophoneGlyph className="mic-icon-svg" />
               </div>
             </button>

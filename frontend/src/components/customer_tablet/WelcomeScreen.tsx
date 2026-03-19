@@ -182,6 +182,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
 
   const [showLoading, setShowLoading]   = useState<boolean>(true);
   const [loadingExit, setLoadingExit]   = useState<boolean>(false);
+  const [welcomeMicActive, setWelcomeMicActive] = useState<boolean>(false);
   const [screen, setScreen]             = useState<Screen>('welcome');
   const [selectedCode, setSelectedCode] = useState<string>('');
   const [selectedName, setSelectedName] = useState<string>('');
@@ -216,16 +217,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
     setSelectedName(name);
     setScreen('confirming');
 
-    // notifyWebSocket is already called inside LanguageSelector,
-    // but we call it here too for safety / if called from other paths
-    notifyWebSocket(code);
-
     // After 1.5s of mic animation, transition to voice screen
     setTimeout(() => {
       const greeting = GREETINGS[code] ?? GREETINGS['en'];
       setMessages([{ id: 0, text: greeting, role: 'agent' }]);
       setMsgCounter(1);
       setScreen('voice');
+      notifyWebSocket(code);
       onLanguageSelect(code, name);
     }, 1500);
   };
@@ -258,6 +256,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
       setElapsed(0);
       timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000);
     }
+  };
+
+  const handleWelcomeMicClick = () => {
+    setWelcomeMicActive(true);
+    window.setTimeout(() => {
+      setWelcomeMicActive(false);
+    }, 2200);
   };
 
   /* ---- Reset ---- */
@@ -305,14 +310,19 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
           </div>
 
           <div className="welcome-callout">
-            <div className="welcome-mic-wrapper" aria-hidden="true">
-              <div className="sonar-ring welcome-sonar-ring sonar-ring-1" />
-              <div className="sonar-ring welcome-sonar-ring sonar-ring-2" />
-              <div className="sonar-ring welcome-sonar-ring sonar-ring-3" />
+            <button
+              type="button"
+              className="welcome-mic-wrapper"
+              aria-label="Decorative microphone"
+              onClick={handleWelcomeMicClick}
+            >
+              {welcomeMicActive && <div className="sonar-ring welcome-sonar-ring sonar-ring-1" />}
+              {welcomeMicActive && <div className="sonar-ring welcome-sonar-ring sonar-ring-2" />}
+              {welcomeMicActive && <div className="sonar-ring welcome-sonar-ring sonar-ring-3" />}
               <div className="welcome-mic-icon">
                 <MicrophoneGlyph className="mic-icon-svg" />
               </div>
-            </div>
+            </button>
 
             <div className="welcome-subtitles">
               <span>Please select your preferred language to begin</span>

@@ -1,52 +1,50 @@
 # backend/core/audio_streamer.py
-import io
-import json
-import time
 import asyncio
-from core.whisper_engine import process_audio
-from core.gemini_llm import detect_intent
+import io
+import websockets
+import audioop
+from whisper_engine import process_audio
 
-CHUNK_DURATION = 3  # seconds
+WS_URI = "ws://localhost:8000/ws/stream"
 
-async def handle_audio_stream(websocket):
-    buffer = io.BytesIO()
-    start_time = time.time()
-    language = "hi"
+# 16kHz, mono, 16-bit PCM
+SAMPLE_RATE = 16000
+FRAME_DURATION_MS = 30  # 10, 20, or 30 ms frames
+SILENCE_THRESHOLD = 500  # adjust for your mic volume
 
-    try:
+def frame_generator(frame_duration_ms, audio, sample_rate):
+    """Generates 16-bit PCM frames from audio bytes"""
+    n = int(sample_rate * (frame_duration_ms / 1000.0) * 2)  # 2 bytes per sample
+    for i in range(0, len(audio), n):
+        yield audio[i:i+n]
+
+def is_speech(frame, threshold=SILENCE_THRESHOLD):
+    """Simple RMS-based voice activity detection"""
+    if len(frame) == 0:
+        return False
+    rms = audioop.rms(frame, 2)  # 2 bytes per sample
+    return rms > threshold
+
+async def audio_streamer():
+    async with websockets.connect(WS_URI) as websocket:
+        buffer = io.BytesIO()
+        print("Connected to WebSocket")
         while True:
-            message = await websocket.receive()
+            audio_chunk = await websocket.recv()
+            if isinstance(audio_chunk, bytes):
+                buffer.write(audio_chunk)
 
-            # 1. Handle JSON messages
-            if "text" in message:
-                data = json.loads(message["text"])
+                frames = list(frame_generator(FRAME_DURATION_MS, buffer.getvalue(), SAMPLE_RATE))
+                speech_frames = [f for f in frames if is_speech(f)]
 
-                if data["type"] == "session_start":
-                    language = data.get("language", "hi")
+                # If >3 sec speech detected, send to Whisper
+                if len(speech_frames) * FRAME_DURATION_MS / 1000.0 >= 3:
+                    buffer.seek(0)
+                    await process_audio(buffer, websocket)
+                    buffer = io.BytesIO()  # reset buffer
 
-                elif data["type"] == "ping":
-                    await websocket.send_text(json.dumps({"type": "pong"}))
+async def main():
+    await audio_streamer()
 
-            # 2. Handle binary audio
-            elif "bytes" in message:
-                buffer.write(message["bytes"])
-
-            # 3. Check if 3 seconds passed
-            if time.time() - start_time >= CHUNK_DURATION:
-                buffer.seek(0)
-
-                result = await process_audio(buffer, language)
-
-                # Send transcript update
-                await websocket.send_text(json.dumps(result["transcript"]))
-
-                # Detect intent
-                intent = await detect_intent(result["translated_text"])
-                if intent:
-                    await websocket.send_text(json.dumps(intent))
-
-                # Reset buffer
-                buffer = io.BytesIO()
-                start_time = time.time()
-    except Exception as e:
-        print("WebSocket error:", e)
+if __name__ == "__main__":
+    asyncio.run(main())

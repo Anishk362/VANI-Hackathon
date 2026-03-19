@@ -139,6 +139,36 @@ body.light-mode .glow-overlay {
   letter-spacing: 0.05em;
 }
 
+.theme-toggle-btn {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.25);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 100;
+  font-family: inherit;
+  letter-spacing: 0.04em;
+}
+
+.theme-toggle-btn:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.4);
+}
+
+body.light-mode .theme-toggle-btn {
+  border-color: rgba(10,22,40,0.25);
+}
+
+body.light-mode .theme-toggle-btn:hover {
+  background: rgba(10,22,40,0.06);
+}
+
 .welcome-container {
   position: relative;
   z-index: 2;
@@ -186,39 +216,79 @@ body.light-mode .welcome-logo {
   gap: 24px;
 }
 
-.welcome-mic-wrapper {
+.vani-mic-orb {
   position: relative;
-  width: 64px;
-  height: 64px;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.welcome-mic-icon {
-  width: 64px;
-  height: 64px;
+.vani-mic-orb__core {
+  position: relative;
+  z-index: 3;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0A3D91, #1557c0);
+  border: 2px solid #FFB81C;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--mic-color);
-  animation: welcomeBreath 2.6s ease-in-out infinite;
+  color: #FFB81C;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 0 24px rgba(255,184,28,0.3), 0 0 48px rgba(10,61,145,0.4);
+  animation: orbBreath 3s ease-in-out infinite;
 }
 
-.welcome-mic-icon .mic-icon-svg {
-  width: 64px;
-  height: 64px;
-  stroke: currentColor;
+.vani-mic-orb__core .mic-icon-svg {
+  width: 32px;
+  height: 32px;
+  stroke: #FFB81C;
   fill: none;
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-.welcome-sonar-ring {
-  width: 64px;
-  height: 64px;
-  border-color: var(--mic-ripple);
+.vani-mic-orb:hover .vani-mic-orb__core {
+  transform: scale(1.08);
+  box-shadow: 0 0 32px rgba(255,184,28,0.5), 0 0 64px rgba(10,61,145,0.5);
+}
+
+.vani-mic-orb__ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,184,28,0.35);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.vani-mic-orb__ring--1 {
+  width: 100px;
+  height: 100px;
+  animation: orbRing 2.4s ease-out infinite;
+}
+
+.vani-mic-orb__ring--2 {
+  width: 100px;
+  height: 100px;
+  animation: orbRing 2.4s ease-out 0.6s infinite;
+}
+
+.vani-mic-orb__ring--3 {
+  width: 100px;
+  height: 100px;
+  animation: orbRing 2.4s ease-out 1.2s infinite;
 }
 
 .welcome-subtitles {
@@ -231,7 +301,9 @@ body.light-mode .welcome-logo {
 .welcome-language-selector {
   width: 100%;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
 
 .language-grid {
@@ -464,6 +536,16 @@ body.light-mode .voice-header-logo {
   background: var(--bg-surface);
   backdrop-filter: blur(12px);
   scroll-behavior: smooth;
+}
+
+.chat-area::-webkit-scrollbar { width: 4px; }
+.chat-area::-webkit-scrollbar-track { background: transparent; }
+.chat-area::-webkit-scrollbar-thumb {
+  background: rgba(255,184,28,0.3);
+  border-radius: 2px;
+}
+.chat-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,184,28,0.5);
 }
 
 .chat-bubble {
@@ -715,6 +797,16 @@ body.light-mode .viz-bar {
     transform: scale(1.05);
     filter: drop-shadow(0 0 12px var(--mic-ripple));
   }
+}
+
+@keyframes orbBreath {
+  0%, 100% { box-shadow: 0 0 24px rgba(255,184,28,0.3), 0 0 48px rgba(10,61,145,0.4); }
+  50% { box-shadow: 0 0 36px rgba(255,184,28,0.55), 0 0 72px rgba(10,61,145,0.55); }
+}
+
+@keyframes orbRing {
+  0% { width: 80px; height: 80px; opacity: 0.7; }
+  100% { width: 180px; height: 180px; opacity: 0; }
 }
 
 /* =====================================================

@@ -16,26 +16,16 @@
 # backend/main.py
 from fastapi import FastAPI, WebSocket
 from core.audio_streamer import handle_audio_stream
-from api.routes import router as api_router  # if dev added API routes
 
 app = FastAPI(title="V.A.N.I Backend")
 
-# --- HTTP Routes ---
-
-# Test / root route
+# 1️⃣ Test HTTP route
 @app.get("/")
 async def home():
     return {"status": "backend running"}
 
-# Include API routes from dev (Abhisoumya)
-app.include_router(api_router, prefix="/api")
-
-# --- WebSocket Route ---
-
+# 2️⃣ WebSocket endpoint
 @app.websocket("/ws/stream")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    try:
-        await handle_audio_stream(websocket)
-    except Exception as e:
-        print("WebSocket connection error:", e)
+    await handle_audio_stream(websocket)

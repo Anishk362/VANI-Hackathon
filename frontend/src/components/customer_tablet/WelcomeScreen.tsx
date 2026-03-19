@@ -180,6 +180,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useThreeBackground(canvasRef);
 
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [showLoading, setShowLoading]   = useState<boolean>(true);
   const [loadingExit, setLoadingExit]   = useState<boolean>(false);
   const [welcomeMicActive, setWelcomeMicActive] = useState<boolean>(false);
@@ -210,6 +211,24 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
       window.clearTimeout(completeTimer);
     };
   }, []);
+
+  /* ---- Theme persistence ---- */
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem('vani-theme');
+    const shouldUseLight = savedTheme === 'light';
+    setIsDarkMode(!shouldUseLight);
+    document.body.classList.toggle('light-mode', shouldUseLight);
+  }, []);
+
+  const handleThemeToggle = () => {
+    setIsDarkMode((prev) => {
+      const nextIsDark = !prev;
+      const theme = nextIsDark ? 'dark' : 'light';
+      document.body.classList.toggle('light-mode', !nextIsDark);
+      window.localStorage.setItem('vani-theme', theme);
+      return nextIsDark;
+    });
+  };
 
   /* ---- Language chosen (from prime tiles OR modal) ---- */
   const handleLanguageSelection = (code: string, name: string) => {
@@ -300,6 +319,28 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
           </div>
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={handleThemeToggle}
+        aria-label="Toggle theme"
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          background: 'transparent',
+          border: '1px solid currentColor',
+          color: 'var(--text-primary)',
+          padding: '8px 16px',
+          borderRadius: '20px',
+          fontSize: '0.85rem',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease',
+          zIndex: 100,
+        }}
+      >
+        {isDarkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+      </button>
 
       {/* --- SCREEN: WELCOME --- */}
       {!showLoading && screen === 'welcome' && (

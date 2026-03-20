@@ -246,7 +246,6 @@ const LanguageModal: React.FC<ModalProps> = ({ isOpen, onClose, onSelect, select
         </div>
 
         <div className="modal-search-wrapper">
-          <span className="modal-search-icon" aria-hidden="true">🔍</span>
           <input
             ref={searchInputRef}
             className="modal-search-input"

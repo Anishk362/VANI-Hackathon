@@ -50,21 +50,26 @@ body.light-mode {
   padding: 0;
 }
 
-html,
-body,
-#root {
+html {
   width: 100%;
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
 }
 
 body {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
   font-family: 'Noto Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg-deepest);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background 0.3s ease, color 0.3s ease;
+}
+
+#root {
+  width: 100%;
+  min-height: 100%;
 }
 
 .script-native {
@@ -78,6 +83,11 @@ body {
   z-index: 0;
   display: block;
   pointer-events: none;
+  opacity: 1;
+}
+
+body.light-mode .three-canvas {
+  opacity: 0.85;
 }
 
 .glow-overlay {
@@ -95,12 +105,11 @@ body.light-mode .glow-overlay {
 .loading-screen {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  background: #0B1220;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--loading-bg);
-  opacity: 1;
+  z-index: 1000;
   transition: opacity 0.5s ease;
 }
 
@@ -113,30 +122,58 @@ body.light-mode .glow-overlay {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  text-align: center;
+  gap: 20px;
 }
 
 .loading-logo {
-  font-size: clamp(3rem, 8vw, 5rem);
+  font-size: 3.5rem;
   font-weight: 700;
-  letter-spacing: 0.24em;
-  color: var(--text-primary);
+  letter-spacing: 0.3em;
+  color: #FFFFFF;
+  margin: 0;
 }
 
 .loading-spinner {
-  width: 46px;
-  height: 46px;
-  border: 3px solid transparent;
-  border-top-color: var(--loading-spinner);
+  width: 32px;
+  height: 32px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top: 2px solid rgba(255,184,28,0.8);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
+.loading-mic-svg {
+  width: 14px;
+  height: 14px;
+  fill: #FFD97D;
+  color: #FFD97D;
+  position: relative;
+  z-index: 5;
+}
+
 .loading-text {
-  font-size: 0.84rem;
-  color: var(--loading-text);
-  letter-spacing: 0.05em;
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+body.light-mode .loading-screen {
+  background: #F0F4F8;
+}
+
+body.light-mode .loading-logo {
+  color: #0B1220;
+}
+
+body.light-mode .loading-spinner {
+  border-color: rgba(10,22,40,0.1);
+  border-top-color: rgba(10,61,145,0.7);
+}
+
+body.light-mode .loading-text {
+  color: rgba(10,22,40,0.4);
 }
 
 .theme-toggle-btn {
@@ -172,13 +209,16 @@ body.light-mode .theme-toggle-btn:hover {
 .welcome-container {
   position: relative;
   z-index: 2;
-  min-height: 100vh;
+  min-height: 100dvh;
+  height: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2rem;
   padding: 2rem;
+  padding-bottom: 2rem;
+  overflow-y: auto;
   text-align: center;
   animation: fadeSlideUp 0.7s ease both;
 }
@@ -216,11 +256,11 @@ body.light-mode .welcome-logo {
   gap: 24px;
 }
 
+/* ============================================
+   VANI MIC ORB — Interactive Component
+   ============================================ */
 .vani-mic-orb {
   position: relative;
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -228,72 +268,228 @@ body.light-mode .welcome-logo {
   align-items: center;
   justify-content: center;
   -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 50%;
 }
 
 .vani-mic-orb__core {
   position: relative;
-  z-index: 3;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #0A3D91, #1557c0);
-  border: 2px solid #FFB81C;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #FFB81C;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 0 24px rgba(255,184,28,0.3), 0 0 48px rgba(10,61,145,0.4);
-  animation: orbBreath 3s ease-in-out infinite;
+  transition: all 0.2s ease;
+  border-radius: 50%;
+  
+  /* IDLE - dark mode */
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  animation: none !important;
+  width: 60px;
+  height: 60px;
 }
 
 .vani-mic-orb__core .mic-icon-svg {
-  width: 32px;
-  height: 32px;
-  stroke: #FFB81C;
-  fill: none;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  width: 52px;
+  height: 52px;
+  fill: #FFD97D;
+  color: #FFD97D; /* Fixes fill="currentColor" inside SVG */
+  stroke: none;
+  filter: none;
+  transition: fill 0.2s ease, color 0.2s ease;
 }
 
-.vani-mic-orb:hover .vani-mic-orb__core {
-  transform: scale(1.08);
-  box-shadow: 0 0 32px rgba(255,184,28,0.5), 0 0 64px rgba(10,61,145,0.5);
+body.light-mode .vani-mic-orb__core .mic-icon-svg {
+  fill: rgba(10,22,40,0.45);
+  color: rgba(10,22,40,0.45);
 }
 
 .vani-mic-orb__ring {
   position: absolute;
   top: 50%;
   left: 50%;
-  border-radius: 50%;
-  border: 1.5px solid rgba(255,184,28,0.35);
   transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
   pointer-events: none;
-  opacity: 0;
 }
 
-.vani-mic-orb__ring--1 {
-  width: 100px;
-  height: 100px;
-  animation: orbRing 2.4s ease-out infinite;
+.vani-mic-orb:not(.is-active) .vani-mic-orb__ring,
+.mic-btn:not(.active) .vani-mic-orb__ring {
+  opacity: 0 !important;
+  animation: none !important;
 }
 
-.vani-mic-orb__ring--2 {
-  width: 100px;
-  height: 100px;
-  animation: orbRing 2.4s ease-out 0.6s infinite;
+/* ACTIVE state */
+.vani-mic-orb.is-active .vani-mic-orb__core {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
-.vani-mic-orb__ring--3 {
-  width: 100px;
-  height: 100px;
-  animation: orbRing 2.4s ease-out 1.2s infinite;
+.vani-mic-orb.is-active .vani-mic-orb__core .mic-icon-svg {
+  fill: rgba(255,255,255,0.9);
+  color: rgba(255,255,255,0.9);
+  stroke: none;
+  filter: none;
 }
 
+.welcome-callout .vani-mic-orb.is-active .vani-mic-orb__core .mic-icon-svg,
+.confirmation-container .vani-mic-orb.is-active .vani-mic-orb__core .mic-icon-svg {
+  fill: #ffd97d;
+  color: #ffd97d;
+}
+
+body.light-mode .vani-mic-orb.is-active .vani-mic-orb__core .mic-icon-svg {
+  fill: rgba(10,22,40,0.8);
+  color: rgba(10,22,40,0.8);
+}
+
+body.light-mode .welcome-callout .vani-mic-orb.is-active .vani-mic-orb__core .mic-icon-svg,
+body.light-mode .confirmation-container .vani-mic-orb.is-active .vani-mic-orb__core .mic-icon-svg {
+  fill: #ffd97d;
+  color: #ffd97d;
+}
+
+.vani-mic-orb.is-active .vani-mic-orb__ring,
+.mic-btn.active .vani-mic-orb__ring {
+  border: 1.5px solid rgba(255,184,28,0.45);
+}
+
+.welcome-callout .vani-mic-orb.is-active .vani-mic-orb__ring,
+.confirmation-container .vani-mic-orb.is-active .vani-mic-orb__ring {
+  border-color: rgba(255,217,125,0.5);
+}
+
+.vani-mic-orb.is-active .vani-mic-orb__ring--1,
+.mic-btn.active .vani-mic-orb__ring--1 {
+  animation: orbRing 2s ease-out infinite;
+}
+
+.vani-mic-orb.is-active .vani-mic-orb__ring--2,
+.mic-btn.active .vani-mic-orb__ring--2 {
+  animation: orbRing 2s ease-out 0.5s infinite;
+}
+
+.vani-mic-orb.is-active .vani-mic-orb__ring--3,
+.mic-btn.active .vani-mic-orb__ring--3 {
+  animation: orbRing 2s ease-out 1s infinite;
+}
+
+/* VOICE CHAT SCREEN MIC */
+.mic-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mic-btn .mic-icon-svg {
+  width: 56px;
+  height: 56px;
+  fill: #FFD97D;
+  color: #FFD97D; /* Fixes fill="currentColor" inside SVG */
+  stroke: none;
+  transition: fill 0.2s ease, color 0.2s ease;
+  filter: none;
+  box-shadow: none;
+}
+
+body.light-mode .mic-btn .mic-icon-svg {
+  fill: rgba(10,22,40,0.45);
+  color: rgba(10,22,40,0.45);
+}
+
+.mic-btn.active .mic-icon-svg {
+  fill: rgba(255,184,28,0.9);
+  color: rgba(255,184,28,0.9);
+}
+
+@keyframes orbRing {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+}
+
+/* ============================================
+   INLINE VOICE INPUT
+   ============================================ */
+.inline-voice-input {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  width: 100%;
+}
+
+.inline-voice-bars {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 48px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.inline-voice-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.1);
+  height: 2px;
+  transition: height 0.09s ease;
+}
+
+body.light-mode .inline-voice-bar {
+  background: rgba(0,0,0,0.1);
+}
+
+.inline-voice-bar.active {
+  background: rgba(255,184,28,0.7);
+}
+
+.inline-voice-timer {
+  font-family: monospace;
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.3);
+  transition: color 0.3s;
+}
+
+.inline-voice-timer.active {
+  color: rgba(255,255,255,0.7);
+}
+
+body.light-mode .inline-voice-timer {
+  color: rgba(0,0,0,0.3);
+}
+
+body.light-mode .inline-voice-timer.active {
+  color: rgba(0,0,0,0.7);
+}
+
+.inline-voice-hint {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.3);
+  transition: color 0.3s;
+  letter-spacing: 0.05em;
+}
+
+.inline-voice-hint.active {
+  color: #FFB81C;
+}
+
+body.light-mode .inline-voice-hint {
+  color: rgba(0,0,0,0.3);
+}
 .welcome-subtitles {
   min-height: 1.7em;
-  color: var(--text-primary);
   font-size: 1.05rem;
   line-height: 1.7;
 }
@@ -389,59 +585,6 @@ body.light-mode .welcome-logo {
   animation: fadeSlideUp 0.5s ease both;
 }
 
-.mic-confirm-wrapper {
-  position: relative;
-  width: 160px;
-  height: 160px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mic-confirm-icon {
-  width: 90px;
-  height: 90px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--mic-color);
-  z-index: 2;
-  filter: drop-shadow(0 0 18px var(--mic-ripple));
-}
-
-.mic-confirm-icon .mic-icon-svg {
-  width: 52px;
-  height: 52px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 1.9;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.sonar-ring {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  border: 2px solid var(--mic-ripple);
-  border-radius: 50%;
-  opacity: 0;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.sonar-ring-1 {
-  animation: sonarPulse 1.9s ease-out infinite;
-}
-
-.sonar-ring-2 {
-  animation: sonarPulse 1.9s ease-out 0.45s infinite;
-}
-
-.sonar-ring-3 {
-  animation: sonarPulse 1.9s ease-out 0.9s infinite;
-}
-
 .confirmation-message {
   max-width: 520px;
   text-align: center;
@@ -466,7 +609,8 @@ body.light-mode .welcome-logo {
 .voice-screen {
   position: relative;
   z-index: 2;
-  min-height: 100vh;
+  min-height: 100dvh;
+  height: auto;
   width: min(100%, 740px);
   margin: 0 auto;
   display: flex;
@@ -589,67 +733,6 @@ body.light-mode .chat-bubble.user {
   backdrop-filter: blur(12px);
 }
 
-.mic-btn {
-  width: 76px;
-  height: 76px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.76);
-  cursor: pointer;
-  transition: transform 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
-}
-
-.mic-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-  transform: scale(1.06);
-}
-
-body.light-mode .mic-btn {
-  background: rgba(10, 22, 40, 0.08);
-  color: rgba(10, 22, 40, 0.78);
-}
-
-body.light-mode .mic-btn:hover {
-  background: rgba(10, 22, 40, 0.12);
-}
-
-.mic-btn.active {
-  background: linear-gradient(135deg, var(--primary), var(--primary-light));
-  color: #ffffff;
-  animation: micPulse 1.5s ease infinite;
-}
-
-.mic-btn .mic-icon-svg {
-  width: 28px;
-  height: 28px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.mic-spinner-sq {
-  display: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 5px;
-  background: #ffffff;
-}
-
-.mic-btn.active .mic-icon-svg {
-  display: none;
-}
-
-.mic-btn.active .mic-spinner-sq {
-  display: block;
-  animation: slowSpin 3s linear infinite;
-}
-
 .voice-timer {
   font-family: 'Courier New', monospace;
   font-size: 0.9rem;
@@ -660,36 +743,6 @@ body.light-mode .mic-btn:hover {
 
 .voice-timer.active {
   color: var(--text-primary);
-}
-
-.visualizer {
-  height: 40px;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.viz-bar {
-  width: 3px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
-  transition: height 0.12s ease, background 0.3s ease;
-}
-
-body.light-mode .viz-bar {
-  background: rgba(10, 22, 40, 0.12);
-}
-
-.voice-hint {
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-  color: var(--text-faint);
-  transition: color 0.3s ease;
-}
-
-.voice-hint.active {
-  color: var(--text-muted);
 }
 
 .reset-link {
@@ -752,62 +805,7 @@ body.light-mode .viz-bar {
   }
 }
 
-@keyframes slowSpin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 
-@keyframes micPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(21, 87, 192, 0.7);
-  }
-
-  70% {
-    box-shadow: 0 0 0 18px rgba(21, 87, 192, 0);
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 rgba(21, 87, 192, 0);
-  }
-}
-
-@keyframes sonarPulse {
-  0% {
-    width: 90px;
-    height: 90px;
-    opacity: 0.6;
-  }
-
-  100% {
-    width: 260px;
-    height: 260px;
-    opacity: 0;
-  }
-}
-
-@keyframes welcomeBreath {
-  0%,
-  100% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 0 rgba(240, 180, 41, 0));
-  }
-
-  50% {
-    transform: scale(1.05);
-    filter: drop-shadow(0 0 12px var(--mic-ripple));
-  }
-}
-
-@keyframes orbBreath {
-  0%, 100% { box-shadow: 0 0 24px rgba(255,184,28,0.3), 0 0 48px rgba(10,61,145,0.4); }
-  50% { box-shadow: 0 0 36px rgba(255,184,28,0.55), 0 0 72px rgba(10,61,145,0.55); }
-}
-
-@keyframes orbRing {
-  0% { width: 80px; height: 80px; opacity: 0.7; }
-  100% { width: 180px; height: 180px; opacity: 0; }
-}
 
 /* =====================================================
    LANGUAGE SELECTOR MODAL STYLES

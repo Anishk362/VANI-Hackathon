@@ -1,8 +1,10 @@
-# backend/main.py
 import asyncio
+import json  # FIX 7: Added missing import
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from core.audio_streamer import frame_generator, vad, SAMPLE_RATE, FRAME_DURATION_MS, process_audio
+
+# FIX 1 & 2: Updated imports and function aliases
+from core.audio_streamer import frame_generator, is_speech_detected as is_speech, SAMPLE_RATE, FRAME_DURATION_MS
 from core.whisper_engine import process_audio as whisper_process
 from core.gemini_llm import handle_generate_summary
 
@@ -26,7 +28,8 @@ class ConnectionManager:
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
 
 manager = ConnectionManager()
 
@@ -34,27 +37,32 @@ manager = ConnectionManager()
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     buffer = bytearray()
+    
     try:
         while True:
             data = await websocket.receive()
             
-            # Handle binary audio
+            # Handle binary audio (Streaming)
             if "bytes" in data:
                 buffer.extend(data["bytes"])
+                
+                # FIX 2: Use is_speech directly as imported
                 frames = list(frame_generator(FRAME_DURATION_MS, buffer, SAMPLE_RATE))
-                speech_frames = [f for f in frames if vad.is_speech(f, SAMPLE_RATE)]
+                speech_frames = [f for f in frames if is_speech(f, SAMPLE_RATE)]
 
                 # If >3 sec speech, process via Whisper
                 if len(speech_frames) * FRAME_DURATION_MS / 1000.0 >= 3:
                     audio_bytes = bytes(buffer)
                     await whisper_process(audio_bytes, websocket)
+                    # Clear buffer to prevent re-processing same audio
                     buffer = bytearray()
 
             # Handle JSON messages (e.g., generate_summary)
             elif "text" in data:
                 msg = data["text"]
                 try:
-                    msg_json = await asyncio.to_thread(lambda: json.loads(msg))
+                    # FIX 7: json.loads now works correctly
+                    msg_json = json.loads(msg)
                     if msg_json.get("type") == "generate_summary":
                         await handle_generate_summary(msg_json, websocket)
                 except Exception as e:
@@ -63,3 +71,10 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
         print("Client disconnected")
+    except Exception as e:
+        manager.disconnect(websocket)
+        print(f"Unexpected error: {e}")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

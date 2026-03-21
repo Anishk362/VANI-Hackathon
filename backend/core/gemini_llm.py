@@ -15,7 +15,7 @@ model = genai.GenerativeModel(
 
 async def detect_intent(text: str, websocket, session_id="UB-2026-XXXX"):
     """
-    FIX 4: Detects intent and saves to DB using the 'intent' field.
+    Detects banking intent from transcribed text and updates frontend + DB.
     """
     if not text: return
 
@@ -38,9 +38,10 @@ async def detect_intent(text: str, websocket, session_id="UB-2026-XXXX"):
     except Exception as e:
         print(f"Intent Detection Error: {e}")
 
-async def handle_generate_summary(websocket, session_id="UB-2026-XXXX"):
+async def handle_generate_summary(msg_json, websocket, session_id="UB-2026-XXXX"):
     """
-    FIX 5: Bilingual summary generation.
+    FIX 2: Signature matches main.py call: handle_generate_summary(msg_json, websocket)
+    Generates bilingual summary.
     """
     prompt = ("Provide a summary of the conversation in JSON: "
               "{'english': '...', 'native': '...'}. Use Hindi for native.")
@@ -62,7 +63,7 @@ async def handle_generate_summary(websocket, session_id="UB-2026-XXXX"):
         print(f"Summary Error: {e}")
 
 def _db_save_intent(session_id, intent_value):
-    """DB Helper - matches 'intent' field name."""
+    """Synchronous DB Helper - matches 'intent' field name."""
     db = SessionLocal()
     try:
         db_intent = Intent(session_id=session_id, intent=intent_value)

@@ -1,6 +1,6 @@
 // [Member 3 - Abhinav] frontend/src/components/customer_tablet/WelcomeScreen.tsx
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { LanguageSelector } from './LanguageSelector';
 import { notifyWebSocket } from '../../services/apiService';
@@ -336,12 +336,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
     });
   };
 
-  const addMessage = useCallback((text: string, role: 'agent' | 'user') => {
-    const id = nextMessageIdRef.current;
-    nextMessageIdRef.current += 1;
-    setMessages((currentMessages) => [...currentMessages, { id, text, role }]);
-  }, []);
-
   const handleLanguageSelection = (code: string, name: string) => {
     if (confirmationTimeoutRef.current !== null) {
       window.clearTimeout(confirmationTimeoutRef.current);
@@ -367,17 +361,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
 
       if (timerRef.current) {
         window.clearInterval(timerRef.current);
-      }
-
-      if (elapsed > 0) {
-        addMessage('मुझे अपने खाते में मदद चाहिए।', 'user');
-
-        responseTimeoutRef.current = window.setTimeout(() => {
-          addMessage(
-            'I can see your account balance is ₹24,580. Is there anything else you need?',
-            'agent',
-          );
-        }, 1600);
       }
 
       setElapsed(0);

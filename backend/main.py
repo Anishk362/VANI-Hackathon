@@ -1,19 +1,18 @@
 import asyncio
-import json  # FIX 7: Added missing import
+import json
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-# FIX 1 & 2: Updated imports and function aliases
-from core.audio_streamer import frame_generator, is_speech_detected as is_speech, SAMPLE_RATE, FRAME_DURATION_MS
+# Imports for the core engine
+from core.audio_streamer import SAMPLE_RATE, FRAME_DURATION_MS
 from core.whisper_engine import process_audio as whisper_process
 from core.gemini_llm import handle_generate_summary
 
 app = FastAPI(title="VANI Backend WebSocket")
 
-# Allow frontend localhost connections
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
@@ -42,38 +41,41 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive()
             
-            # Handle binary audio (Streaming)
+            # 1. Handle Binary Audio (Streaming)
             if "bytes" in data:
                 buffer.extend(data["bytes"])
                 
-                # FIX 2: Use is_speech directly as imported
-                frames = list(frame_generator(FRAME_DURATION_MS, buffer, SAMPLE_RATE))
-                speech_frames = [f for f in frames if is_speech(f, SAMPLE_RATE)]
-
-                # If >3 sec speech, process via Whisper
-                if len(speech_frames) * FRAME_DURATION_MS / 1000.0 >= 3:
+                # ISSUE 2 FIX: Process when buffer hits ~100KB (3-4 seconds)
+                if len(buffer) >= 100000: 
                     audio_bytes = bytes(buffer)
+                    # Calls the ffmpeg-enabled whisper engine
                     await whisper_process(audio_bytes, websocket)
-                    # Clear buffer to prevent re-processing same audio
                     buffer = bytearray()
 
-            # Handle JSON messages (e.g., generate_summary)
+            # 2. Handle JSON Messages (ISSUE 3 FIX)
             elif "text" in data:
                 msg = data["text"]
                 try:
-                    # FIX 7: json.loads now works correctly
                     msg_json = json.loads(msg)
-                    if msg_json.get("type") == "generate_summary":
+                    msg_type = msg_json.get("type")
+
+                    if msg_type == "session_start":
+                        print(f"Session started with language: {msg_json.get('language')}")
+
+                    elif msg_type == "ping":
+                        pass  # Silent keepalive to prevent log noise
+
+                    elif msg_type == "generate_summary":
                         await handle_generate_summary(msg_json, websocket)
+
                 except Exception as e:
-                    print("Invalid JSON message:", e)
+                    print(f"Invalid JSON message: {e}")
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-        print("Client disconnected")
     except Exception as e:
-        manager.disconnect(websocket)
         print(f"Unexpected error: {e}")
+        manager.disconnect(websocket)
 
 if __name__ == "__main__":
     import uvicorn

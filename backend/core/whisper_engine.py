@@ -39,7 +39,7 @@ async def process_audio(audio_bytes: bytes, websocket):
                 "timestamp": timestamp
             }
         }
-        await websocket.send_text(json.dumps(transcript_update_json))
+        await websocket.send_text(json.dumps(transcript_json))
 
         # 2. Send session meta once
         if session_id not in SESSION_SENT:

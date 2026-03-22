@@ -21,7 +21,8 @@ async def detect_intent(text: str, websocket, session_id="UB-2026-XXXX"):
 
     try:
         response = await asyncio.to_thread(model.generate_content, text)
-        data = json.loads(response.text)
+        raw = response.text.strip().replace("```json", "").replace("```", "").strip()
+        data = json.loads(raw)
         detected_intent_value = data.get("intent", "unknown")
 
         process_trigger_json = {
@@ -52,7 +53,8 @@ async def handle_generate_summary(msg_json, websocket, session_id="UB-2026-XXXX"
             prompt,
             generation_config={"response_mime_type": "application/json"}
         )
-        res_data = json.loads(response.text)
+        raw = response.text.strip().replace("```json", "").replace("```", "").strip()
+        res_data = json.loads(raw)
         
         await websocket.send_text(json.dumps({
             "type": "summary_ready",

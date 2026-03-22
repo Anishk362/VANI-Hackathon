@@ -4,3 +4,4 @@ sqlalchemy
 pydantic
 openai-whisper
 google-generativeai
+webrtcvad

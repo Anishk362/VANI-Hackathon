@@ -15,11 +15,16 @@ const Dashboard: React.FC = () => {
   const [sessionMeta, setSessionMeta] = useState<SessionMeta | null>(null);
 
   useEffect(() => {
-    vaniWS.connect();
-
+    // Dashboard is receive-only — it listens for broadcasts but never sends audio
+    vaniWS.connect(true);
+    
     vaniWS.onMessage = (msg: VANIMessage) => {
       if (msg.type === 'transcript_update') {
-        setTranscript(prev => [...prev, msg.data]);
+        // Pass A sends originalText only (empty translatedText) for the customer tablet.
+        // Dashboard only shows bubbles that have English translation (Pass B).
+        if (msg.data.translatedText) {
+          setTranscript(prev => [...prev, msg.data]);
+        }
       } else if (msg.type === 'process_trigger') {
         setActiveTrigger(msg);
       } else if (msg.type === 'session_meta') {
@@ -30,6 +35,7 @@ const Dashboard: React.FC = () => {
     };
 
     return () => {
+      vaniWS.onMessage = null;
       vaniWS.disconnect();
     };
   }, []);

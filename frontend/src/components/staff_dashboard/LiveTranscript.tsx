@@ -34,9 +34,11 @@ const Bubble = React.memo(({ line }: { line: TranscriptLine }) => {
   };
 
   const originalStyle: React.CSSProperties = {
-    fontSize: '1rem',
+    fontSize: '1.1rem',
+    lineHeight: 1.6,
     color: '#FFFFFF',
     marginBottom: '6px',
+    fontFamily: "'Noto Sans', 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Noto Sans Tamil', 'Noto Sans Telugu', 'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Gujarati', 'Noto Sans Gurmukhi', sans-serif",
   };
 
   const dividerStyle: React.CSSProperties = {
@@ -46,7 +48,8 @@ const Bubble = React.memo(({ line }: { line: TranscriptLine }) => {
   };
 
   const translatedStyle: React.CSSProperties = {
-    fontSize: '0.9rem',
+    fontSize: '0.95rem',
+    lineHeight: 1.5,
     color: '#A0AEC0',
     fontStyle: 'italic',
   };

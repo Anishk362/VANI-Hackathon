@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { LanguageSelector } from './LanguageSelector';
-import { notifyWebSocket } from '../../services/apiService';
+import { vaniWS } from '../../services/websocketService';
 
 type Screen = 'welcome' | 'confirming' | 'voice';
 
@@ -15,6 +15,14 @@ interface ChatMessage {
   id: number;
   text: string;
   role: 'agent' | 'user';
+}
+
+// Create a global interface for the SpeechRecognition API to avoid TS errors
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
 }
 
 interface VANIMicProps {
@@ -285,9 +293,11 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
   const [selectedCode, setSelectedCode] = useState<string>('');
   const [selectedName, setSelectedName] = useState<string>('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [interimText, setInterimText] = useState<string>('');
   const [recording, setRecording] = useState<boolean>(false);
   const [elapsed, setElapsed] = useState<number>(0);
   const [welcomeMicActive, setWelcomeMicActive] = useState<boolean>(false);
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
     if (chatAreaRef.current) {
@@ -324,6 +334,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
       if (responseTimeoutRef.current !== null) {
         window.clearTimeout(responseTimeoutRef.current);
       }
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
     };
   }, []);
 
@@ -350,7 +363,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
       setMessages([{ id: 0, text: greeting, role: 'agent' }]);
       nextMessageIdRef.current = 1;
       setScreen('voice');
-      notifyWebSocket(code);
+      // Dispatch language event so websocketService picks it up when mic is tapped
+      window.dispatchEvent(new CustomEvent('vani:language-selected', {
+        detail: { languageCode: code }
+      }));
       onLanguageSelect(code, name);
     }, 1500);
   };
@@ -358,17 +374,104 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
   const handleMicToggle = () => {
     if (recording) {
       setRecording(false);
+      setInterimText('');
 
       if (timerRef.current) {
         window.clearInterval(timerRef.current);
       }
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
 
       setElapsed(0);
+      vaniWS.stopRecording();
       return;
     }
 
     setRecording(true);
     setElapsed(0);
+    setInterimText('');
+    console.log('[VANI] Mic tapped — starting SpeechRecognition and WS');
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = selectedCode;
+
+      recognition.onresult = (event: any) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+
+        if (interimTranscript) {
+          setInterimText(interimTranscript);
+        }
+
+        if (finalTranscript) {
+          setInterimText('');
+          const trimmed = finalTranscript.trim();
+          if (trimmed) {
+            // Display immediately on the tablet UI
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: nextMessageIdRef.current++,
+                text: trimmed,
+                role: 'user' as const,
+              },
+            ]);
+
+            // Fire across WebSocket to the backend for Translator/Gemini processing
+            if (vaniWS.ws?.readyState === WebSocket.OPEN) {
+              vaniWS.ws.send(JSON.stringify({
+                type: 'native_text',
+                text: trimmed,
+                // generate a fake timestamp just like the backend used to
+                timestamp: new Date().toISOString()
+              }));
+              console.log(`[VANI] Sent final transcript chunk to backend: "${trimmed}"`);
+            }
+          }
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('[SpeechRecognition Error]:', event.error);
+      };
+
+      recognition.onend = () => {
+        // If it stops but we are still recording (e.g. timeout), auto-restart it
+        if (recording) {
+          recognition.start();
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } else {
+      console.warn("Speech recognition is not fully supported in this browser.");
+      alert("Voice recognition is not supported in your browser. Please use Chrome.");
+    }
+
+    // Ignore backend transcript updates since the tablet UI renders them instantly 
+    // from SpeechRecognition! (Pass B is completely ignored now on the tablet).
+    vaniWS.onMessage = (msg) => {
+      // Intentionally do nothing with `transcript_update`.
+      // If we wanted to, we could show 'process_trigger' overlays here too.
+    };
+
+    vaniWS.connect().then(() => {
+      console.log('[VANI] connect() resolved');
+    });
     timerRef.current = window.setInterval(() => {
       setElapsed((seconds) => seconds + 1);
     }, 1000);
@@ -391,12 +494,19 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
 
     setRecording(false);
     setElapsed(0);
+    setInterimText('');
     setMessages([]);
     nextMessageIdRef.current = 0;
     setSelectedCode('');
     setSelectedName('');
     setWelcomeMicActive(false);
     setScreen('welcome');
+    vaniWS.onMessage = null;
+    vaniWS.disconnect();
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
   };
   const confirmationText =
     CONFIRMATION_MESSAGES[selectedCode] ?? 'Language selected. You may speak now.';
@@ -478,6 +588,11 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onLanguageSelect }
                 {message.text}
               </div>
             ))}
+            {interimText && (
+              <div className="chat-bubble user script-native interim-bubble">
+                {interimText}
+              </div>
+            )}
           </div>
 
           <InlineVoiceInput

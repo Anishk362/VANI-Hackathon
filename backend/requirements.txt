@@ -5,3 +5,4 @@ pydantic
 openai-whisper
 google-generativeai
 webrtcvad
+python-dotenv

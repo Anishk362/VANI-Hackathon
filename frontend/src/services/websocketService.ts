@@ -1,17 +1,28 @@
 import type { VANIMessage, SessionMeta } from '../types/transcript.ts';
 
 class VANIWebSocketService {
+  constructor(){
+    window.addEventListener('vani:language-selected', (e: Event) => {
+      const { languageCode } = (e as CustomEvent<{ languageCode: string }>).detail;
+      this.selectedLanguage = languageCode;
+    });
+  }
   public ws: WebSocket | null = null;
-  private mediaRecorder: MediaRecorder | null = null;
   public onMessage: ((msg: VANIMessage) => void) | null = null;
   public onSessionMeta: ((meta: SessionMeta) => void) | null = null;
   private pingInterval: number | null = null;
   private reconnectTimeout: number | null = null;
   private isConnecting: boolean = false;
-  private stream: MediaStream | null = null;
+  private intentionalDisconnect: boolean = false;
   private selectedLanguage: string = 'hi'; // default to Hindi
 
-  async connect(): Promise<void> {
+  // receiveOnly = true  → used by the Staff Dashboard (listen for broadcasts, no mic)
+  // receiveOnly = false → used by the Customer Tablet (send audio + receive)
+  private receiveOnly: boolean = false;
+
+  async connect(receiveOnly: boolean = false): Promise<void> {
+    this.receiveOnly = receiveOnly;
+    this.intentionalDisconnect = false;
     if (this.isConnecting || (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING))) {
       return;
     }
@@ -19,30 +30,20 @@ class VANIWebSocketService {
     this.isConnecting = true;
 
     try {
-      this.ws = new WebSocket('ws://localhost:8000/ws/stream');
-
-      // The event listener must be added only once
-      // Register it when the session starts
-      window.addEventListener('vani:language-selected', (e: Event) => {
-        const { languageCode } = (e as CustomEvent<{ languageCode: string }>).detail;
-        this.selectedLanguage = languageCode;
-      });
+      const wsUrl = window.location.hostname === 'localhost'
+        ? 'ws://localhost:3000/ws/stream'
+        : `ws://${window.location.host}/ws/stream`;
+      this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = async () => {
         this.isConnecting = false;
-        
-        this.ws?.send(JSON.stringify({ 
-          type: 'session_start', 
-          language: this.selectedLanguage 
+
+        this.ws?.send(JSON.stringify({
+          type: 'session_start',
+          language: this.selectedLanguage
         }));
 
         this.startPing();
-        try {
-          this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          this.setupRecorder(this.stream);
-        } catch (err) {
-          console.error('Failed to get user media', err);
-        }
       };
 
       this.ws.onmessage = (event) => {
@@ -68,6 +69,8 @@ class VANIWebSocketService {
   }
 
   disconnect(): void {
+    this.intentionalDisconnect = true;
+    this.isConnecting = false; // must reset — onclose is nulled below, so it won't reset itself
     this.cleanup();
     if (this.ws) {
       this.ws.onclose = null;
@@ -80,17 +83,13 @@ class VANIWebSocketService {
     }
   }
 
-  private setupRecorder(stream: MediaStream): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-
-    this.mediaRecorder = new MediaRecorder(stream);
-    this.mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0 && this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(event.data);
-      }
-    };
-    // Record chunks every 250ms
-    this.mediaRecorder.start(250);
+  /**
+   * Stop recording audio and release the microphone, but keep the WebSocket
+   * connection open so incoming transcript_update broadcasts from the backend
+   * (which arrive 15-20s after audio capture ends) can still be received.
+   */
+  stopRecording(): void {
+    this.intentionalDisconnect = true; 
   }
 
   private handleMessage(raw: string): void {
@@ -115,7 +114,7 @@ class VANIWebSocketService {
           language: this.selectedLanguage 
         }));
       }
-    }, 30000);
+    }, 5000);
   }
 
   private cleanup(): void {
@@ -123,20 +122,14 @@ class VANIWebSocketService {
       window.clearInterval(this.pingInterval);
       this.pingInterval = null;
     }
-    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-      this.mediaRecorder.stop();
-    }
-    if (this.stream) {
-      this.stream.getTracks().forEach(track => track.stop());
-      this.stream = null;
-    }
   }
 
   private scheduleReconnect(): void {
+    if (this.intentionalDisconnect) return;
     if (this.reconnectTimeout !== null) return;
     this.reconnectTimeout = window.setTimeout(() => {
       this.reconnectTimeout = null;
-      this.connect();
+      this.connect(this.receiveOnly); // preserve the mode across reconnects
     }, 3000);
   }
 }
